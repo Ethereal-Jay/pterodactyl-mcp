@@ -71,6 +71,7 @@ Add to your MCP client config (e.g. `~/.config/opencode/mcp.json`):
 | `pterodactyl_rename_server` | Rename a server and update its description |
 | `pterodactyl_reinstall_server` | Trigger a reinstall of the server |
 | `pterodactyl_get_websocket` | Get WebSocket token/socket URL for console access |
+| `pterodactyl_get_console` | Retrieve recent console output via WebSocket |
 | `pterodactyl_get_account` | Get authenticated account details |
 
 **Files:**

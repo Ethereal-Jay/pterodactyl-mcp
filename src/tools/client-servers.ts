@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
+import { WebSocket } from "ws";
 import {
   PterodactylClient,
   handleApiError,
@@ -419,6 +420,104 @@ Args:
           content: [{ type: "text", text: JSON.stringify(acct, null, 2) }],
           structuredContent: sc(acct),
         };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Get Console Output ──
+  server.registerTool(
+    "pterodactyl_get_console",
+    {
+      title: "Get Server Console Output",
+      description: `Retrieve recent console output for a server via WebSocket.
+
+Connects to the server's console WebSocket, authenticates, requests the
+console log history, and returns the buffered output. Because the
+panel does not expose console logs via the REST API this tool opens a
+short-lived WebSocket connection.
+
+The server must be running.
+
+Args:
+  - server (string): Server identifier
+  - lines (number): Maximum lines to return (default: 100)`,
+      inputSchema: z.object({
+        server: z.string().min(1).describe("Server identifier (short ID)"),
+        lines: z.number().int().min(1).max(1000).default(100).describe("Maximum console lines (1-1000, default 100)"),
+      }).strict(),
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({ server: serverId, lines }) => {
+      try {
+        // 1. Get WebSocket credentials
+        const wsResp = await client.clientGet<{ data: { token: string; socket: string } }>(
+          `servers/${serverId}/websocket`
+        );
+        const { token, socket } = wsResp.data;
+
+        // 2. Connect, auth, request logs, collect output
+        const output = await new Promise<string>((resolve, reject) => {
+          const ws = new WebSocket(socket);
+          const lines_buf: string[] = [];
+          let authDone = false;
+          let logsDone = false;
+          const timer = setTimeout(() => {
+            ws.close();
+            resolve(lines_buf.join("\n") || "(no console output received within timeout)");
+          }, 12_000);
+
+          ws.on("open", () => {
+            ws.send(JSON.stringify({ event: "auth", args: [token] }));
+          });
+
+          ws.on("message", (raw) => {
+            let msg: { event?: string; args?: string[] };
+            try { msg = JSON.parse(raw.toString()); } catch { return; }
+
+            if (msg.event === "auth success") {
+              authDone = true;
+              ws.send(JSON.stringify({ event: "send logs", args: [null] }));
+            } else if (msg.event === "console output") {
+              const text = Array.isArray(msg.args) ? msg.args.join("\n") : "";
+              if (text) lines_buf.push(text);
+              if (lines_buf.length >= lines && !logsDone) {
+                logsDone = true;
+                clearTimeout(timer);
+                ws.close();
+                resolve(lines_buf.join("\n"));
+              }
+            } else if (msg.event === "token expiring" || msg.event === "token expired") {
+              clearTimeout(timer);
+              ws.close();
+              reject(new Error("WebSocket token expired during connection"));
+            }
+          });
+
+          ws.on("error", (err) => {
+            clearTimeout(timer);
+            reject(err);
+          });
+
+          ws.on("close", () => {
+            clearTimeout(timer);
+            if (!logsDone) resolve(lines_buf.join("\n") || "(connection closed before logs arrived; is the server running?)");
+          });
+        });
+
+        // 3. Trim to requested line count (newest first → reverse, take N, re-reverse)
+        const allLines = output.split("\n");
+        const recent = allLines.length > lines
+          ? allLines.slice(allLines.length - lines)
+          : allLines;
+
+        return { content: [{ type: "text", text: recent.join("\n") }] };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
       }
