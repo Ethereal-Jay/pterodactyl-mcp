@@ -1,4 +1,5 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import axios from "axios";
 import {
   PterodactylClient,
   handleApiError,
@@ -339,22 +340,20 @@ Args:
         const buf = Buffer.from(content, "base64");
         fs.writeFileSync(tmpPath, buf);
 
-        // 3. Upload to the signed URL via multipart form
+        // 3. Append directory as a query param on the signed URL (required by
+        //    the daemon) and POST the file as multipart/form-data using axios
+        //    rather than form-data's built-in submit (which can 500).
+        const uploadUrl = new URL(signedUrl);
+        uploadUrl.searchParams.set("directory", directory);
+
         const form = new FormData();
         form.append("files", fs.createReadStream(tmpPath), { filename: file_name });
         form.append("directory", directory);
 
-        await new Promise<void>((resolve, reject) => {
-          form.submit(signedUrl, (err, res) => {
-            if (err) return reject(err);
-            const body: Buffer[] = [];
-            res.on("data", (chunk: Buffer) => body.push(chunk));
-            res.on("end", () => {
-              const status = res.statusCode ?? 0;
-              if (status >= 200 && status < 300) resolve();
-              else reject(new Error(`Upload returned HTTP ${status}: ${Buffer.concat(body).toString().slice(0, 300)}`));
-            });
-          });
+        await axios.post(uploadUrl.toString(), form, {
+          headers: form.getHeaders(),
+          maxContentLength: Infinity,
+          maxBodyLength: Infinity,
         });
 
         return {
