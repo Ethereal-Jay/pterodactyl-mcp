@@ -81,6 +81,7 @@ Add to your MCP client config (e.g. `~/.config/opencode/mcp.json`):
 | `pterodactyl_list_files` | List files and directories |
 | `pterodactyl_read_file` | Read a file's contents |
 | `pterodactyl_write_file` | Write content to a file |
+| `pterodactyl_upload_file` | Upload a file (base64 content) via signed URL |
 | `pterodactyl_create_folder` | Create a new directory |
 | `pterodactyl_delete_files` | Delete files or directories |
 | `pterodactyl_copy_file` | Copy a file or directory |

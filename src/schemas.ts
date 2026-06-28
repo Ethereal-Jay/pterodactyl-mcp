@@ -72,6 +72,12 @@ export const DecompressFileSchema = ServerIdentifier.extend({
   file: z.string().min(1).describe("Full path to the archive to decompress"),
 }).strict();
 
+export const UploadFileSchema = ServerIdentifier.extend({
+  directory: z.string().default("/").describe("Target directory on the server (default: '/')"),
+  file_name: z.string().min(1).describe("Name for the uploaded file (e.g. 'server.properties')"),
+  content: z.string().min(1).describe("Base64-encoded file content"),
+}).strict();
+
 // --- Client: Databases ---
 
 export const CreateDatabaseSchema = ServerIdentifier.extend({

@@ -16,7 +16,12 @@ import {
   CopyFileSchema,
   CompressFilesSchema,
   DecompressFileSchema,
+  UploadFileSchema,
 } from "../schemas.js";
+import fs from "fs";
+import path from "path";
+import os from "os";
+import FormData from "form-data";
 
 export function registerClientFileTools(server: McpServer, client: PterodactylClient) {
   // ── List Files ──
@@ -291,6 +296,75 @@ Args:
         return { content: [{ type: "text", text: `Archive '${archiveFile}' extracted on server ${serverId}.` }] };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Upload File ──
+  server.registerTool(
+    "pterodactyl_upload_file",
+    {
+      title: "Upload File to Server",
+      description: `Upload a file to the server using a two-step signed-URL process.
+
+Provide the file content as a base64-encoded string.
+
+Args:
+  - server (string): Server identifier
+  - directory (string): Target directory on the server (default: '/')
+  - file_name (string): Name for the uploaded file
+  - content (string): Base64-encoded file content`,
+      inputSchema: UploadFileSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ server: serverId, directory, file_name, content }) => {
+      const tmpPath = path.join(os.tmpdir(), `pterodactyl-upload-${Date.now()}-${file_name}`);
+      try {
+        // 1. Get signed upload URL from the panel
+        const signedResp = await client.clientGet<{
+          object: string;
+          attributes: { url: string };
+        }>(`servers/${serverId}/files/upload`, { directory });
+        const signedUrl = signedResp.attributes?.url;
+        if (!signedUrl) {
+          return { content: [{ type: "text", text: "Error: panel returned no signed URL for upload." }] };
+        }
+
+        // 2. Decode base64 and write to a temp file
+        const buf = Buffer.from(content, "base64");
+        fs.writeFileSync(tmpPath, buf);
+
+        // 3. Upload to the signed URL via multipart form
+        const form = new FormData();
+        form.append("files", fs.createReadStream(tmpPath), { filename: file_name });
+        form.append("directory", directory);
+
+        await new Promise<void>((resolve, reject) => {
+          form.submit(signedUrl, (err, res) => {
+            if (err) return reject(err);
+            const body: Buffer[] = [];
+            res.on("data", (chunk: Buffer) => body.push(chunk));
+            res.on("end", () => {
+              const status = res.statusCode ?? 0;
+              if (status >= 200 && status < 300) resolve();
+              else reject(new Error(`Upload returned HTTP ${status}: ${Buffer.concat(body).toString().slice(0, 300)}`));
+            });
+          });
+        });
+
+        return {
+          content: [{ type: "text", text: `File '${file_name}' uploaded to ${directory} on server ${serverId}.` }],
+        };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      } finally {
+        // Clean up temp file
+        try { fs.unlinkSync(tmpPath); } catch {}
       }
     }
   );
