@@ -129,7 +129,7 @@ Args:
     },
     async ({ server: serverId, file: filePath, content }) => {
       try {
-        await client.clientPost(`servers/${serverId}/files/write`, content, { file: filePath });
+        await client.clientPost(`servers/${serverId}/files/write`, content, { file: filePath }, { "Content-Type": "text/plain" });
         return { content: [{ type: "text", text: `File '${filePath}' written successfully on server ${serverId}.` }] };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

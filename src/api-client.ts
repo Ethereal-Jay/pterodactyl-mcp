@@ -49,8 +49,8 @@ export class PterodactylClient {
     return response.data;
   }
 
-  async clientPost<T>(endpoint: string, data?: unknown, params?: Record<string, unknown>): Promise<T> {
-    const response = await this.clientApi.post<T>(endpoint, data, { params });
+  async clientPost<T>(endpoint: string, data?: unknown, params?: Record<string, unknown>, headers?: Record<string, string>): Promise<T> {
+    const response = await this.clientApi.post<T>(endpoint, data, { params, headers });
     return response.data;
   }
 
