@@ -2,8 +2,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   PterodactylClient,
   handleApiError,
+  sc,
 } from "../api-client.js";
-import { type PterodactylResponse, type Allocation } from "../types.js";
+import { type PterodactylListResponse, type Allocation } from "../types.js";
 import {
   ResponseFormat,
   ServerIdentifier,
@@ -34,7 +35,10 @@ Args:
     },
     async ({ server: serverId, response_format }) => {
       try {
-        const { data: allocs } = await client.clientGet<Allocation[]>(`servers/${serverId}/network/allocations`);
+        const resp = await client.clientGet<PterodactylListResponse<Allocation>>(
+          `servers/${serverId}/network/allocations`
+        );
+        const allocs = resp.data.map((item) => item.attributes);
         if (!allocs.length) {
           return { content: [{ type: "text", text: `No allocations found on server ${serverId}.` }] };
         }
@@ -52,7 +56,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(allocs, null, 2) }],
-          structuredContent: allocs,
+          structuredContent: sc(allocs),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -60,11 +64,11 @@ Args:
     }
   );
 
-  // ── Assign Allocation ──
+  // ── Create Allocation ──
   server.registerTool(
-    "pterodactyl_assign_allocation",
+    "pterodactyl_create_allocation",
     {
-      title: "Assign Network Allocation",
+      title: "Create Network Allocation",
       description: `Assign a new network allocation (IP:Port) to a server.
 
 If ip and port are omitted, the panel will auto-assign from available node allocations.
@@ -94,12 +98,40 @@ Args:
     }
   );
 
-  // ── Remove Allocation ──
+  // ── Set Primary Allocation ──
   server.registerTool(
-    "pterodactyl_remove_allocation",
+    "pterodactyl_set_primary_allocation",
     {
-      title: "Remove Network Allocation",
-      description: `Remove an allocation from a server. The default allocation cannot be removed.
+      title: "Set Primary Network Allocation",
+      description: `Set an existing allocation as the server's primary allocation.
+
+Args:
+  - server (string): Server identifier
+  - allocation (number): Allocation ID to make primary`,
+      inputSchema: AllocationIdentifier,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: true,
+        openWorldHint: true,
+      },
+    },
+    async ({ server: serverId, allocation }) => {
+      try {
+        await client.clientPost(`servers/${serverId}/network/allocations/${allocation}/primary`);
+        return { content: [{ type: "text", text: `Allocation ${allocation} set as primary for server ${serverId}.` }] };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
+      }
+    }
+  );
+
+  // ── Delete Allocation ──
+  server.registerTool(
+    "pterodactyl_delete_allocation",
+    {
+      title: "Delete Network Allocation",
+      description: `Remove an allocation from a server. The primary allocation cannot be removed.
 
 Args:
   - server (string): Server identifier

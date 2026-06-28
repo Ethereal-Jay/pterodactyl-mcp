@@ -141,3 +141,14 @@ export function formatUptime(ms: number): string {
   if (minutes > 0) parts.push(`${minutes}m`);
   return parts.length > 0 ? parts.join(" ") : "<1m";
 }
+
+/**
+ * Wrap arbitrary structured data for the MCP `structuredContent` field.
+ * The MCP SDK requires `structuredContent` to satisfy
+ * `{ [x: string]: unknown }`; raw interfaces and arrays fail that constraint
+ * at compile time even though they serialise fine at runtime. This helper
+ * applies the necessary `unknown`-bridge cast.
+ */
+export function sc<T>(value: T): { [key: string]: unknown } | undefined {
+  return value === undefined ? undefined : (value as unknown as { [key: string]: unknown });
+}

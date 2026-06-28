@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   PterodactylClient,
   handleApiError,
+  sc,
 } from "../api-client.js";
 import { type PterodactylResponse, type PterodactylListResponse, type Location } from "../types.js";
 import {
@@ -49,13 +50,14 @@ Args:
         if (sort) query.sort = sort;
 
         const data = await client.appGet<PterodactylListResponse<Location>>("locations", query);
-        if (!data.data.length) {
+        const locations = data.data.map((item) => item.attributes);
+        if (!locations.length) {
           return { content: [{ type: "text", text: "No locations found." }] };
         }
 
         if (response_format === "markdown") {
           const lines = [`# Locations (Page ${page}/${data.meta.pagination.total_pages}, Total: ${data.meta.pagination.total})`, ""];
-          for (const l of data.data) {
+          for (const l of locations) {
             lines.push(`## ${l.short} (ID: ${l.id})`);
             if (l.long) lines.push(`- **Description**: ${l.long}`);
             lines.push("");
@@ -65,8 +67,8 @@ Args:
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-          structuredContent: data,
+          content: [{ type: "text", text: JSON.stringify(locations, null, 2) }],
+          structuredContent: sc(locations),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -102,7 +104,7 @@ Args:
         if (include) query.include = include;
 
         const data = await client.appGet<PterodactylResponse<Location>>(`locations/${locId}`, query);
-        const l = data.attributes || data.data;
+        const l = data.attributes;
 
         if (response_format === "markdown") {
           const lines = [`# Location: ${l.short}`, "", `**ID**: ${l.id}`];
@@ -112,7 +114,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(l, null, 2) }],
-          structuredContent: l,
+          structuredContent: sc(l),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -141,7 +143,7 @@ Args:
     async (params) => {
       try {
         const data = await client.appPost<PterodactylResponse<Location>>("locations", params);
-        const l = data.attributes || data.data;
+        const l = data.attributes;
         return {
           content: [{ type: "text", text: `Location '${l.short}' created (ID: ${l.id}).` }],
         };

@@ -9,15 +9,26 @@ export interface PaginationMeta {
   };
 }
 
+/** A single Pterodactyl API resource — body shape is `{ object, attributes, meta?, relationships? }`. */
 export interface PterodactylResponse<T> {
   object: string;
-  data: T;
-  meta?: PaginationMeta;
+  attributes: T;
+  meta?: Record<string, unknown>;
+  relationships?: Record<string, unknown>;
 }
 
-export interface PterodactylListResponse<T> {
+/** A wrapper entry inside `PterodactylListResponse.data` arrays. */
+export interface PterodactylResource<T> {
   object: string;
-  data: T[];
+  attributes: T;
+  meta?: Record<string, unknown>;
+  relationships?: Record<string, unknown>;
+}
+
+/** A Pterodactyl API collection — body shape is `{ object: "list", data: PterodactylResource<T>[], meta }`. */
+export interface PterodactylListResponse<T> {
+  object: "list";
+  data: PterodactylResource<T>[];
   meta: PaginationMeta;
 }
 
@@ -196,8 +207,8 @@ export interface Schedule {
   updated_at: string;
   relationships?: {
     tasks?: {
-      object: string;
-      data: ScheduleTask[];
+      object: "list";
+      data: PterodactylResource<ScheduleTask>[];
     };
   };
 }
@@ -324,8 +335,8 @@ export interface Egg {
   };
   relationships?: {
     variables?: {
-      object: string;
-      data: EggVariable[];
+      object: "list";
+      data: PterodactylResource<EggVariable>[];
     };
     nest?: {
       object: string;

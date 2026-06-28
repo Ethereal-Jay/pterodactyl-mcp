@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   PterodactylClient,
   handleApiError,
+  sc,
 } from "../api-client.js";
 import { type PterodactylResponse, type PterodactylListResponse, type Database, type DatabasePassword } from "../types.js";
 import {
@@ -35,7 +36,8 @@ Args:
     },
     async ({ server: serverId, response_format }) => {
       try {
-        const { data: dbs } = await client.clientGet<Database[]>(`servers/${serverId}/databases`);
+        const resp = await client.clientGet<PterodactylListResponse<Database>>(`servers/${serverId}/databases`);
+        const dbs = resp.data.map((item) => item.attributes);
         if (!dbs.length) {
           return { content: [{ type: "text", text: `No databases found on server ${serverId}.` }] };
         }
@@ -55,7 +57,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(dbs, null, 2) }],
-          structuredContent: dbs,
+          structuredContent: sc(dbs),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -85,9 +87,14 @@ Args:
     },
     async ({ server: serverId, database, remote, response_format }) => {
       try {
-        const { data: db } = await client.clientPost<Database>(`servers/${serverId}/databases`, { database: database, remote });
+        const resp = await client.clientPost<PterodactylResponse<Database>>(
+          `servers/${serverId}/databases`,
+          { database: database, remote }
+        );
+        const db = resp.attributes;
         if (response_format === "markdown") {
-          const pw = db.relationships?.password?.attributes?.password || "(hidden)";
+          const pw = (resp.relationships as { password?: { attributes: { password: string } } } | undefined)
+            ?.password?.attributes?.password || "(hidden)";
           const lines = [
             `# Database Created`,
             "",
@@ -104,7 +111,7 @@ Args:
         }
         return {
           content: [{ type: "text", text: JSON.stringify(db, null, 2) }],
-          structuredContent: db,
+          structuredContent: sc(db),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -134,8 +141,10 @@ Args:
     },
     async ({ server: serverId, db }) => {
       try {
-        const { data: result } = await client.clientPost<PterodactylResponse<DatabasePassword>>(`servers/${serverId}/databases/${db}/rotate-password`);
-        const pw = result.attributes?.password || (result as unknown as DatabasePassword).password;
+        const resp = await client.clientPost<PterodactylResponse<DatabasePassword>>(
+          `servers/${serverId}/databases/${db}/rotate-password`
+        );
+        const pw = resp.attributes.password;
         return { content: [{ type: "text", text: `Password rotated for database ID ${db}.\nNew password: \`${pw}\`` }] };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

@@ -3,6 +3,7 @@ import {
   PterodactylClient,
   handleApiError,
   formatBytes,
+  sc,
 } from "../api-client.js";
 import { type PterodactylResponse, type PterodactylListResponse, type Node, type NodeAllocation } from "../types.js";
 import { z } from "zod";
@@ -52,15 +53,16 @@ Args:
         if (sort) query.sort = sort;
 
         const data = await client.appGet<PterodactylListResponse<Node>>("nodes", query);
-        if (!data.data.length) {
+        const nodes = data.data.map((item) => item.attributes);
+        if (!nodes.length) {
           return { content: [{ type: "text", text: "No nodes found." }] };
         }
 
         if (response_format === "markdown") {
           const lines = [`# Nodes (Page ${page}/${data.meta.pagination.total_pages}, Total: ${data.meta.pagination.total})`, ""];
-          for (const n of data.data) {
-            const memUsed = n.allocated_resources?.memory ?? 0;
-            const diskUsed = n.allocated_resources?.disk ?? 0;
+          for (const n of nodes) {
+            const memUsed = (n.allocated_resources as { memory?: number } | undefined)?.memory ?? 0;
+            const diskUsed = (n.allocated_resources as { disk?: number } | undefined)?.disk ?? 0;
             const memPct = n.memory > 0 ? ((memUsed / n.memory) * 100).toFixed(1) : "N/A";
             const diskPct = n.disk > 0 ? ((diskUsed / n.disk) * 100).toFixed(1) : "N/A";
             lines.push(`## ${n.name} (ID: ${n.id})`);
@@ -79,8 +81,8 @@ Args:
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-          structuredContent: data,
+          content: [{ type: "text", text: JSON.stringify(nodes, null, 2) }],
+          structuredContent: sc(nodes),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -116,7 +118,7 @@ Args:
         if (include) query.include = include;
 
         const data = await client.appGet<PterodactylResponse<Node>>(`nodes/${nodeId}`, query);
-        const n = data.attributes || data.data;
+        const n = data.attributes;
 
         if (response_format === "markdown") {
           const lines = [
@@ -146,7 +148,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(n, null, 2) }],
-          structuredContent: n,
+          structuredContent: sc(n),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -183,7 +185,7 @@ Args:
     async (params) => {
       try {
         const data = await client.appPost<PterodactylResponse<Node>>("nodes", params);
-        const n = data.attributes || data.data;
+        const n = data.attributes;
         return {
           content: [{ type: "text", text: `Node '${n.name}' created (ID: ${n.id}, UUID: ${n.uuid}).` }],
         };
@@ -271,7 +273,8 @@ Args:
     },
     async ({ node: nodeId }) => {
       try {
-        const { data: config } = await client.appGet<string>(`nodes/${nodeId}/configuration`);
+        // The configuration endpoint returns YAML as a plain text body.
+        const config = await client.appGet<string>(`nodes/${nodeId}/configuration`);
         return { content: [{ type: "text", text: typeof config === "string" ? config : JSON.stringify(config, null, 2) }] };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -302,13 +305,14 @@ Args:
     async ({ node: nodeId, page, per_page, response_format }) => {
       try {
         const data = await client.appGet<PterodactylListResponse<NodeAllocation>>(`nodes/${nodeId}/allocations`, { page, per_page });
-        if (!data.data.length) {
+        const allocs = data.data.map((item) => item.attributes);
+        if (!allocs.length) {
           return { content: [{ type: "text", text: `No allocations found on node ${nodeId}.` }] };
         }
 
         if (response_format === "markdown") {
           const lines = [`# Allocations for Node ${nodeId} (Total: ${data.meta.pagination.total})`, ""];
-          for (const a of data.data) {
+          for (const a of allocs) {
             lines.push(`- ${a.ip}:${a.port} (ID: ${a.id}, Assigned: ${a.assigned ? "Yes" : "No"})`);
             if (a.notes) lines.push(`  Notes: ${a.notes}`);
           }
@@ -317,8 +321,8 @@ Args:
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-          structuredContent: data,
+          content: [{ type: "text", text: JSON.stringify(allocs, null, 2) }],
+          structuredContent: sc(allocs),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

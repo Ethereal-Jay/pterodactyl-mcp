@@ -92,7 +92,7 @@ Add to your MCP client config (e.g. `~/.config/opencode/mcp.json`):
 |------|-------------|
 | `pterodactyl_list_databases` | List server databases |
 | `pterodactyl_create_database` | Create a new database |
-| `pterodactyl_rotate_db_password` | Rotate a database password |
+| `pterodactyl_rotate_database_password` | Rotate a database password |
 | `pterodactyl_delete_database` | Delete a database |
 
 **Backups:**
@@ -163,6 +163,7 @@ Requires an Application API key (`ptla_...`).
 | `pterodactyl_admin_update_server_startup` | Update startup config, egg, image |
 | `pterodactyl_admin_suspend_server` | Suspend a server |
 | `pterodactyl_admin_unsuspend_server` | Unsuspend a server |
+| `pterodactyl_admin_reinstall_server` | Trigger a reinstall of the server |
 | `pterodactyl_admin_delete_server` | Delete a server |
 
 **Nodes:**
@@ -174,8 +175,8 @@ Requires an Application API key (`ptla_...`).
 | `pterodactyl_admin_create_node` | Create a new node |
 | `pterodactyl_admin_update_node` | Update a node |
 | `pterodactyl_admin_delete_node` | Delete a node |
-| `pterodactyl_admin_get_node_config` | Get node wings configuration |
-| `pterodactyl_admin_list_node_allocations` | List node allocations |
+| `pterodactyl_admin_get_node_configuration` | Get node wings configuration |
+| `pterodactyl_admin_list_allocations` | List node allocations |
 | `pterodactyl_admin_create_allocations` | Create allocations on a node |
 | `pterodactyl_admin_delete_allocation` | Delete an allocation |
 

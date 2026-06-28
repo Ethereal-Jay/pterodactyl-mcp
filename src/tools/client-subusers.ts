@@ -2,8 +2,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   PterodactylClient,
   handleApiError,
+  sc,
 } from "../api-client.js";
-import { type PterodactylResponse, type Subuser } from "../types.js";
+import { type PterodactylListResponse, type Subuser } from "../types.js";
 import {
   ResponseFormat,
   ServerIdentifier,
@@ -33,7 +34,8 @@ Args:
     },
     async ({ server: serverId, response_format }) => {
       try {
-        const { data: users } = await client.clientGet<Subuser[]>(`servers/${serverId}/users`);
+        const resp = await client.clientGet<PterodactylListResponse<Subuser>>(`servers/${serverId}/users`);
+        const users = resp.data.map((item) => item.attributes);
         if (!users.length) {
           return { content: [{ type: "text", text: `No subusers found on server ${serverId}.` }] };
         }
@@ -52,7 +54,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(users, null, 2) }],
-          structuredContent: users,
+          structuredContent: sc(users),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

@@ -4,6 +4,7 @@ import {
   PterodactylClient,
   handleApiError,
   formatBytes,
+  sc,
 } from "../api-client.js";
 import { type PterodactylResponse, type PterodactylListResponse, type Server, type Database } from "../types.js";
 import {
@@ -53,14 +54,15 @@ Args:
         if (sort) query.sort = sort;
 
         const data = await client.appGet<PterodactylListResponse<Server>>("servers", query);
+        const servers = data.data.map((item) => item.attributes);
 
-        if (!data.data.length) {
+        if (!servers.length) {
           return { content: [{ type: "text", text: "No servers found." }] };
         }
 
         if (response_format === "markdown") {
           const lines = [`# All Servers (Page ${page}/${data.meta.pagination.total_pages}, Total: ${data.meta.pagination.total})`, ""];
-          for (const s of data.data) {
+          for (const s of servers) {
             lines.push(`## ${s.name} (${s.identifier})`);
             lines.push(`- **ID**: ${s.id}`);
             lines.push(`- **UUID**: ${s.uuid}`);
@@ -76,8 +78,8 @@ Args:
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-          structuredContent: data,
+          content: [{ type: "text", text: JSON.stringify(servers, null, 2) }],
+          structuredContent: sc(servers),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -115,7 +117,7 @@ Args:
 
         const endpoint = typeof serverId === "number" ? `servers/${serverId}` : `servers/external/${serverId}`;
         const data = await client.appGet<PterodactylResponse<Server>>(endpoint, query);
-        const s = data.attributes || data.data;
+        const s = data.attributes;
 
         if (response_format === "markdown") {
           const lines = [
@@ -147,7 +149,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(s, null, 2) }],
-          structuredContent: s,
+          structuredContent: sc(s),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -184,7 +186,7 @@ Args:
     async (params) => {
       try {
         const data = await client.appPost<PterodactylResponse<Server>>("servers", params);
-        const s = data.attributes || data.data;
+        const s = data.attributes;
         return {
           content: [{ type: "text", text: `Server '${s.name}' created (ID: ${s.id}, Identifier: ${s.identifier}).` }],
         };

@@ -99,6 +99,10 @@ export const RestoreBackupSchema = ServerIdentifier.extend({
   truncate: z.boolean().optional().describe("If true, delete all files first before restoring"),
 }).strict();
 
+export const LockBackupSchema = ServerIdentifier.extend({
+  backup: z.string().uuid().describe("Backup UUID to lock/unlock"),
+}).strict();
+
 // --- Client: Schedules ---
 
 export const CreateScheduleSchema = z.object({

@@ -5,6 +5,7 @@ import {
   handleApiError,
   formatBytes,
   formatUptime,
+  sc,
 } from "../api-client.js";
 import {
   type PterodactylResponse,
@@ -48,7 +49,8 @@ Returns: List of servers with identifiers, names, statuses, and resource limits.
     },
     async ({ response_format }) => {
       try {
-        const { data: servers } = await client.clientGet<ClientServer[]>("");
+        const resp = await client.clientGet<PterodactylListResponse<ClientServer>>("");
+        const servers = resp.data.map((item) => item.attributes);
         if (!servers.length) {
           return { content: [{ type: "text", text: "No servers found on your account." }] };
         }
@@ -86,7 +88,7 @@ Returns: List of servers with identifiers, names, statuses, and resource limits.
 
         return {
           content: [{ type: "text", text: textContent }],
-          structuredContent: output,
+          structuredContent: sc(output),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -116,8 +118,8 @@ Args:
     },
     async ({ server: serverId, response_format }) => {
       try {
-        const { data: s } = await client.clientGet<PterodactylResponse<ClientServer>>(`servers/${serverId}`);
-        const srv = s.attributes || s;
+        const resp = await client.clientGet<PterodactylResponse<ClientServer>>(`servers/${serverId}`);
+        const srv = resp.attributes;
 
         if (response_format === "markdown") {
           const status = srv.is_suspended ? "Suspended" : srv.is_installing ? "Installing" : "Running";
@@ -149,13 +151,13 @@ Args:
             "",
           ];
           if (srv.description) lines.push(`**Description**: ${srv.description}`, "");
-          textContent = lines.join("\n");
+          const textContent = lines.join("\n");
           return { content: [{ type: "text", text: textContent }] };
         }
 
         return {
           content: [{ type: "text", text: JSON.stringify(srv, null, 2) }],
-          structuredContent: srv,
+          structuredContent: sc(srv),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -185,8 +187,8 @@ Args:
     },
     async ({ server: serverId, response_format }) => {
       try {
-        const { data: r } = await client.clientGet<PterodactylResponse<ServerResources>>(`servers/${serverId}/resources`);
-        const res = r.attributes || r;
+        const r = await client.clientGet<PterodactylResponse<ServerResources>>(`servers/${serverId}/resources`);
+        const res = r.attributes;
 
         if (response_format === "markdown") {
           const memPct = res.resources.memory_limit_bytes > 0
@@ -211,7 +213,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(res, null, 2) }],
-          structuredContent: res,
+          structuredContent: sc(res),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -360,11 +362,15 @@ Args:
     },
     async ({ server: serverId }) => {
       try {
-        const { data: ws } = await client.clientGet<Record<string, unknown>>(`servers/${serverId}/websocket`);
-        const info = (ws as Record<string, unknown>).attributes || ws;
+        // NOTE: the websocket endpoint is the lone Client API endpoint that
+        // returns `{ data: { token, socket } }` rather than `{ attributes: ... }`.
+        const resp = await client.clientGet<{ data: { token: string; socket: string } }>(
+          `servers/${serverId}/websocket`
+        );
+        const info = resp.data;
         return {
           content: [{ type: "text", text: JSON.stringify(info, null, 2) }],
-          structuredContent: info,
+          structuredContent: sc(info),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -393,8 +399,8 @@ Args:
     },
     async ({ response_format }) => {
       try {
-        const { data: a } = await client.clientGet<PterodactylResponse<Account>>("account");
-        const acct = a.attributes || a;
+        const a = await client.clientGet<PterodactylResponse<Account>>("account");
+        const acct = a.attributes;
 
         if (response_format === "markdown") {
           const lines = [
@@ -411,7 +417,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(acct, null, 2) }],
-          structuredContent: acct,
+          structuredContent: sc(acct),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

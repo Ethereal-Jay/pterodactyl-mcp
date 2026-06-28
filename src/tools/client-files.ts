@@ -3,8 +3,9 @@ import {
   PterodactylClient,
   handleApiError,
   formatBytes,
+  sc,
 } from "../api-client.js";
-import { type PterodactylResponse, type PterodactylListResponse, type FileObject } from "../types.js";
+import { type PterodactylListResponse, type FileObject } from "../types.js";
 import {
   ResponseFormat,
   ListFilesSchema,
@@ -39,7 +40,11 @@ Args:
     },
     async ({ server: serverId, directory, response_format }) => {
       try {
-        const { data: files } = await client.clientGet<FileObject[]>(`servers/${serverId}/files/list`, { directory });
+        const resp = await client.clientGet<PterodactylListResponse<FileObject>>(
+          `servers/${serverId}/files/list`,
+          { directory }
+        );
+        const files = resp.data.map((item) => item.attributes);
         if (!files.length) {
           return { content: [{ type: "text", text: `Directory '${directory}' is empty.` }] };
         }
@@ -58,7 +63,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(files, null, 2) }],
-          structuredContent: files,
+          structuredContent: sc(files),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -89,8 +94,9 @@ Args:
     },
     async ({ server: serverId, file: filePath, response_format }) => {
       try {
-        const { data } = await client.clientGet<string>(`servers/${serverId}/files/contents`, { file: filePath });
-        const content = typeof data === "string" ? data : JSON.stringify(data);
+        // The contents endpoint returns the file body as plain text (not JSON-wrapped).
+        const data = await client.clientGet<string>(`servers/${serverId}/files/contents`, { file: filePath });
+        const content = typeof data === "string" ? data : JSON.stringify(data, null, 2);
 
         if (response_format === "markdown") {
           return { content: [{ type: "text", text: `\`\`\`\n# ${filePath}\n${content}\n\`\`\`` }] };

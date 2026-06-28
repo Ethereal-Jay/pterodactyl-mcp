@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   PterodactylClient,
   handleApiError,
+  sc,
 } from "../api-client.js";
 import { type PterodactylResponse, type PterodactylListResponse, type Nest, type Egg } from "../types.js";
 import {
@@ -42,13 +43,14 @@ Args:
         if (include) query.include = include;
 
         const data = await client.appGet<PterodactylListResponse<Nest>>("nests", query);
-        if (!data.data.length) {
+        const nests = data.data.map((item) => item.attributes);
+        if (!nests.length) {
           return { content: [{ type: "text", text: "No nests found." }] };
         }
 
         if (response_format === "markdown") {
           const lines = [`# Nests (Page ${page}/${data.meta.pagination.total_pages}, Total: ${data.meta.pagination.total})`, ""];
-          for (const n of data.data) {
+          for (const n of nests) {
             lines.push(`## ${n.name} (ID: ${n.id})`);
             lines.push(`- **Author**: ${n.author}`);
             lines.push(`- **UUID**: ${n.uuid}`);
@@ -60,8 +62,8 @@ Args:
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-          structuredContent: data,
+          content: [{ type: "text", text: JSON.stringify(nests, null, 2) }],
+          structuredContent: sc(nests),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -97,7 +99,7 @@ Args:
         if (include) query.include = include;
 
         const data = await client.appGet<PterodactylResponse<Nest>>(`nests/${nestId}`, query);
-        const n = data.attributes || data.data;
+        const n = data.attributes;
 
         if (response_format === "markdown") {
           const lines = [
@@ -113,7 +115,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(n, null, 2) }],
-          structuredContent: n,
+          structuredContent: sc(n),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -151,13 +153,14 @@ Args:
         if (include) query.include = include;
 
         const data = await client.appGet<PterodactylListResponse<Egg>>(`nests/${nestId}/eggs`, query);
-        if (!data.data.length) {
+        const eggs = data.data.map((item) => item.attributes);
+        if (!eggs.length) {
           return { content: [{ type: "text", text: `No eggs found in nest ${nestId}.` }] };
         }
 
         if (response_format === "markdown") {
           const lines = [`# Eggs in Nest ${nestId} (Page ${page}/${data.meta.pagination.total_pages}, Total: ${data.meta.pagination.total})`, ""];
-          for (const e of data.data) {
+          for (const e of eggs) {
             lines.push(`## ${e.name} (ID: ${e.id})`);
             lines.push(`- **Author**: ${e.author}`);
             lines.push(`- **UUID**: ${e.uuid}`);
@@ -171,8 +174,8 @@ Args:
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-          structuredContent: data,
+          content: [{ type: "text", text: JSON.stringify(eggs, null, 2) }],
+          structuredContent: sc(eggs),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -211,7 +214,7 @@ Args:
         if (include) query.include = include;
 
         const data = await client.appGet<PterodactylResponse<Egg>>(`nests/${nestId}/eggs/${eggId}`, query);
-        const e = data.attributes || data.data;
+        const e = data.attributes;
 
         if (response_format === "markdown") {
           const lines = [
@@ -234,7 +237,8 @@ Args:
             }
           }
 
-          const variables = e.relationships?.variables?.data || [];
+          const variablesRaw = e.relationships?.variables?.data || [];
+          const variables = variablesRaw.map((v) => v.attributes);
           if (variables.length > 0) {
             lines.push("", "## Environment Variables");
             for (const v of variables) {
@@ -250,7 +254,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(e, null, 2) }],
-          structuredContent: e,
+          structuredContent: sc(e),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

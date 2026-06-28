@@ -2,8 +2,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   PterodactylClient,
   handleApiError,
+  sc,
 } from "../api-client.js";
-import { type PterodactylResponse, type PterodactylListResponse, type Schedule, type ScheduleTask } from "../types.js";
+import { type PterodactylResponse, type PterodactylListResponse, type Schedule } from "../types.js";
 import {
   ResponseFormat,
   ServerIdentifier,
@@ -37,7 +38,8 @@ Args:
     },
     async ({ server: serverId, response_format }) => {
       try {
-        const { data: schedules } = await client.clientGet<Schedule[]>(`servers/${serverId}/schedules`);
+        const resp = await client.clientGet<PterodactylListResponse<Schedule>>(`servers/${serverId}/schedules`);
+        const schedules = resp.data.map((item) => item.attributes);
         if (!schedules.length) {
           return { content: [{ type: "text", text: `No schedules found on server ${serverId}.` }] };
         }
@@ -60,7 +62,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(schedules, null, 2) }],
-          structuredContent: schedules,
+          structuredContent: sc(schedules),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -89,8 +91,10 @@ Args:
     },
     async ({ server: serverId, schedule, response_format }) => {
       try {
-        const { data: sched } = await client.clientGet<PterodactylResponse<Schedule>>(`servers/${serverId}/schedules/${schedule}`);
-        const s = sched.attributes || sched;
+        const resp = await client.clientGet<PterodactylResponse<Schedule>>(
+          `servers/${serverId}/schedules/${schedule}`
+        );
+        const s = resp.attributes;
 
         if (response_format === "markdown") {
           const cron = `${s.cron.minute} ${s.cron.hour} ${s.cron.day_of_month} ${s.cron.month} ${s.cron.day_of_week}`;
@@ -106,7 +110,8 @@ Args:
             "",
           ];
 
-          const tasks = s.relationships?.tasks?.data || [];
+          const tasksRaw = s.relationships?.tasks?.data || [];
+          const tasks = tasksRaw.map((t) => t.attributes);
           if (tasks.length > 0) {
             lines.push("## Tasks", "");
             for (const t of tasks) {
@@ -118,7 +123,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(s, null, 2) }],
-          structuredContent: s,
+          structuredContent: sc(s),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -161,8 +166,11 @@ Args:
           is_active: params.is_active,
           only_when_online: params.only_when_online,
         };
-        const { data: sched } = await client.clientPost<PterodactylResponse<Schedule>>(`servers/${params.server}/schedules`, body);
-        const s = sched.attributes || sched;
+        const resp = await client.clientPost<PterodactylResponse<Schedule>>(
+          `servers/${params.server}/schedules`,
+          body
+        );
+        const s = resp.attributes;
         return {
           content: [{ type: "text", text: `Schedule '${params.name}' created on server ${params.server} (ID: ${s.id}).` }],
         };

@@ -2,6 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import {
   PterodactylClient,
   handleApiError,
+  sc,
 } from "../api-client.js";
 import { type PterodactylResponse, type PterodactylListResponse, type User } from "../types.js";
 import {
@@ -53,14 +54,15 @@ Args:
         if (sort) query.sort = sort;
 
         const data = await client.appGet<PterodactylListResponse<User>>("users", query);
+        const users = data.data.map((item) => item.attributes);
 
-        if (!data.data.length) {
+        if (!users.length) {
           return { content: [{ type: "text", text: "No users found." }] };
         }
 
         if (response_format === "markdown") {
           const lines = [`# Users (Page ${page}/${data.meta.pagination.total_pages}, Total: ${data.meta.pagination.total})`, ""];
-          for (const u of data.data) {
+          for (const u of users) {
             lines.push(`## ${u.username} (ID: ${u.id})`);
             lines.push(`- **Email**: ${u.email}`);
             lines.push(`- **Name**: ${u.first_name} ${u.last_name}`);
@@ -75,8 +77,8 @@ Args:
         }
 
         return {
-          content: [{ type: "text", text: JSON.stringify(data, null, 2) }],
-          structuredContent: data,
+          content: [{ type: "text", text: JSON.stringify(users, null, 2) }],
+          structuredContent: sc(users),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -110,7 +112,7 @@ Args:
 
         const endpoint = typeof user === "number" ? `users/${user}` : `users/external/${user}`;
         const data = await client.appGet<PterodactylResponse<User>>(endpoint, query);
-        const u = data.attributes || data.data;
+        const u = data.attributes;
 
         if (response_format === "markdown") {
           const lines = [
@@ -132,7 +134,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(u, null, 2) }],
-          structuredContent: u,
+          structuredContent: sc(u),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -169,7 +171,7 @@ Args:
       try {
         const { response_format, ...body } = params;
         const data = await client.appPost<PterodactylResponse<User>>("users", body);
-        const u = data.attributes || data.data;
+        const u = data.attributes;
 
         if (response_format === "markdown") {
           const lines = [
@@ -187,7 +189,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(u, null, 2) }],
-          structuredContent: u,
+          structuredContent: sc(u),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -220,7 +222,7 @@ Args:
           if (value !== undefined) body[key] = value;
         }
         const data = await client.appPatch<PterodactylResponse<User>>(`users/${userId}`, body);
-        const u = data.attributes || data.data;
+        const u = data.attributes;
         return {
           content: [{ type: "text", text: `User ${userId} (${u.username}) updated successfully.` }],
         };
