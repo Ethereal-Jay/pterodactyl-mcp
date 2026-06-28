@@ -18,6 +18,7 @@ import {
   CompressFilesSchema,
   DecompressFileSchema,
   UploadFileSchema,
+  PullFileSchema,
 } from "../schemas.js";
 import fs from "fs";
 import path from "path";
@@ -323,8 +324,17 @@ Args:
         openWorldHint: true,
       },
     },
-    async ({ server: serverId, directory, file_name, content }) => {
-      const tmpPath = path.join(os.tmpdir(), `pterodactyl-upload-${Date.now()}-${file_name}`);
+    async ({ server: serverId, directory, file_name, content, file_path }) => {
+      // Require at least one of content or file_path
+      if (!content && !file_path) {
+        return { content: [{ type: "text", text: "Error: either 'content' (base64) or 'file_path' (local file) must be provided." }] };
+      }
+
+      const tmpPath = file_path
+        ? file_path  // use the local file directly — no temp copy needed
+        : path.join(os.tmpdir(), `pterodactyl-upload-${Date.now()}-${file_name}`);
+      const cleanUpTemp = !file_path; // only clean up if we created a temp file
+
       try {
         // 1. Get signed upload URL from the panel
         const signedResp = await client.clientGet<{
@@ -336,13 +346,13 @@ Args:
           return { content: [{ type: "text", text: "Error: panel returned no signed URL for upload." }] };
         }
 
-        // 2. Decode base64 and write to a temp file
-        const buf = Buffer.from(content, "base64");
-        fs.writeFileSync(tmpPath, buf);
+        // 2. Decode base64 to a temp file (only when no file_path supplied)
+        if (!file_path) {
+          const buf = Buffer.from(content!, "base64");
+          fs.writeFileSync(tmpPath, buf);
+        }
 
-        // 3. Append directory as a query param on the signed URL (required by
-        //    the daemon) and POST the file as multipart/form-data using axios
-        //    rather than form-data's built-in submit (which can 500).
+        // 3. Append directory as a query param on the signed URL
         const uploadUrl = new URL(signedUrl);
         uploadUrl.searchParams.set("directory", directory);
 
@@ -356,14 +366,55 @@ Args:
           maxBodyLength: Infinity,
         });
 
+        const source = file_path ? file_path : "base64";
         return {
-          content: [{ type: "text", text: `File '${file_name}' uploaded to ${directory} on server ${serverId}.` }],
+          content: [{ type: "text", text: `File '${file_name}' uploaded to ${directory} on server ${serverId} (source: ${source}).` }],
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
       } finally {
-        // Clean up temp file
-        try { fs.unlinkSync(tmpPath); } catch {}
+        if (cleanUpTemp) {
+          try { fs.unlinkSync(tmpPath); } catch {}
+        }
+      }
+    }
+  );
+
+  // ── Pull Remote File ──
+  server.registerTool(
+    "pterodactyl_pull_file",
+    {
+      title: "Pull Remote File to Server",
+      description: `Download a file from a URL directly to the server (no local transfer).
+
+The panel fetches the URL and saves the file on the server's filesystem.
+Ideal for large files — avoids the base64 truncation and upload bandwidth costs.
+
+Limits: max file size 1 GB, timeout 5 minutes, HTTP/HTTPS only.
+
+Args:
+  - server (string): Server identifier
+  - url (string): URL of the file to download
+  - directory (string): Directory to save the file (default: '/')
+  - filename (string, optional): Custom filename (auto-detected if omitted)`,
+      inputSchema: PullFileSchema,
+      annotations: {
+        readOnlyHint: false,
+        destructiveHint: false,
+        idempotentHint: false,
+        openWorldHint: true,
+      },
+    },
+    async ({ server: serverId, url, directory, filename }) => {
+      try {
+        const body: Record<string, string> = { url, directory };
+        if (filename) body.filename = filename;
+        await client.clientPost(`servers/${serverId}/files/pull`, body);
+        return {
+          content: [{ type: "text", text: `Remote file download started on server ${serverId} from ${url} → ${directory}.` }],
+        };
+      } catch (error) {
+        return { content: [{ type: "text", text: handleApiError(error) }] };
       }
     }
   );

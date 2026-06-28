@@ -75,7 +75,14 @@ export const DecompressFileSchema = ServerIdentifier.extend({
 export const UploadFileSchema = ServerIdentifier.extend({
   directory: z.string().default("/").describe("Target directory on the server (default: '/')"),
   file_name: z.string().min(1).describe("Name for the uploaded file (e.g. 'server.properties')"),
-  content: z.string().min(1).describe("Base64-encoded file content"),
+  content: z.string().optional().describe("Base64-encoded file content (use file_path instead for large files)"),
+  file_path: z.string().optional().describe("Absolute local filesystem path to the file (bypasses base64 truncation)"),
+}).strict();
+
+export const PullFileSchema = ServerIdentifier.extend({
+  url: z.string().min(1).describe("URL of the file to download directly to the server"),
+  directory: z.string().default("/").describe("Directory to save the downloaded file (default: '/')"),
+  filename: z.string().optional().describe("Custom filename (optional, auto-detected from URL if omitted)"),
 }).strict();
 
 // --- Client: Databases ---
