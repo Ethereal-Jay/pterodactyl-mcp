@@ -79,7 +79,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(servers, null, 2) }],
-          structuredContent: sc(servers),
+          structuredContent: sc({ servers: servers }),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

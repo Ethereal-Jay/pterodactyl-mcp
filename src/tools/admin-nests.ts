@@ -63,7 +63,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(nests, null, 2) }],
-          structuredContent: sc(nests),
+          structuredContent: sc({ nests: nests }),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -175,7 +175,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(eggs, null, 2) }],
-          structuredContent: sc(eggs),
+          structuredContent: sc({ eggs: eggs }),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

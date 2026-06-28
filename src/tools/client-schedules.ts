@@ -62,7 +62,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(schedules, null, 2) }],
-          structuredContent: sc(schedules),
+          structuredContent: sc({ schedules: schedules }),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

@@ -82,7 +82,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(nodes, null, 2) }],
-          structuredContent: sc(nodes),
+          structuredContent: sc({ nodes: nodes }),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
@@ -322,7 +322,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(allocs, null, 2) }],
-          structuredContent: sc(allocs),
+          structuredContent: sc({ allocations: allocs }),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

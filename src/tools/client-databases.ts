@@ -57,7 +57,7 @@ Args:
 
         return {
           content: [{ type: "text", text: JSON.stringify(dbs, null, 2) }],
-          structuredContent: sc(dbs),
+          structuredContent: sc({ databases: dbs }),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };

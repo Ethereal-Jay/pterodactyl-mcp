@@ -88,7 +88,7 @@ Returns: List of servers with identifiers, names, statuses, and resource limits.
 
         return {
           content: [{ type: "text", text: textContent }],
-          structuredContent: sc(output),
+          structuredContent: sc({ servers: output }),
         };
       } catch (error) {
         return { content: [{ type: "text", text: handleApiError(error) }] };
