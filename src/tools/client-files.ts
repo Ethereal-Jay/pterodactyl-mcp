@@ -129,6 +129,16 @@ Args:
     },
     async ({ server: serverId, file: filePath, content }) => {
       try {
+        // LLM tool calls often pass $`\n`$ as literal backslash+n rather than
+        // a real newline. Decode JSON-like escape sequences so the file on
+        // disk contains actual line breaks, tabs, etc.
+        // Order matters: handle $`\\\\`$ (two backslashes) last so it doesn't
+        // interfere with $`\\n`$, $`\\t`$, etc.
+        content = content
+          .replace(/\\n/g, "\n")
+          .replace(/\\t/g, "\t")
+          .replace(/\\r/g, "\r")
+          .replace(/\\\\/g, "\\");
         await client.clientPost(`servers/${serverId}/files/write`, content, { file: filePath }, { "Content-Type": "text/plain" });
         return { content: [{ type: "text", text: `File '${filePath}' written successfully on server ${serverId}.` }] };
       } catch (error) {
